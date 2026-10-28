@@ -134,6 +134,7 @@ void sprite_set_text_line_space(struct sact_sprite *sp, int px);
 void sprite_set_text_char_space(struct sact_sprite *sp, int px);
 void sprite_set_text_pos(struct sact_sprite *sp, int x, int y);
 void sprite_text_draw(struct sact_sprite *sp, struct string *text, struct text_style *ts);
+void sprite_text_record(struct sact_sprite *sp, const char *text, struct text_style *ts, float x, int y);
 void sprite_text_clear(struct sact_sprite *sp);
 void sprite_text_home(struct sact_sprite *sp, int size);
 void sprite_text_new_line(struct sact_sprite *sp, int size);

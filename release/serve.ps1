@@ -2,10 +2,15 @@
 # Serves this folder at http://localhost:8642/ with the headers the game
 # engine needs (cross-origin isolation), then opens the game page.
 # Close this window to stop the server.
+#
+# Each game gets its own port: the browser keeps installed game files and
+# saves per port, so installing a second game on the same port replaces the
+# first one (saves included).
+
+param([int]$port = 8642)
 
 $ErrorActionPreference = 'Stop'
 $root = Join-Path $PSScriptRoot 'site'
-$port = 8642
 $prefix = "http://localhost:$port/"
 
 $mime = @{
@@ -38,7 +43,7 @@ try {
 }
 
 Write-Host "xsystem4 + Yomitan is running at ${prefix}play.html"
-Write-Host 'First time: pick a ZIP of your Rance VI folder on the page. Then hold Shift and hover text to look it up.'
+Write-Host 'First time: pick a ZIP of your game folder on the page. Then hold Shift and hover text to look it up.'
 Write-Host 'Keep this window open while playing. Close it to stop.'
 try { Start-Process "${prefix}play.html" } catch { Write-Host "Open ${prefix}play.html in Chrome or Edge." }
 

@@ -28,6 +28,13 @@ Status: WORKING on the user's Rance VI (confirmed by the user).
   canvas (same letterboxing as video.c), scaleX-fitted to the game's width.
   Lines get pointer-events only while Shift is held; mouse events on them are
   re-dispatched to the canvas. Ctrl+Alt+Y = debug view (red text).
+- Sengoku Rance (Kagura Steam build, C:\Program Files\Steam\steamapps\
+  common\Sengoku Rance, runs Rance7.ain) draws text via
+  SengokuRanceFont.SP_TextDraw, which bypasses sprite_text_draw();
+  sp_text_draw() there calls sprite_text_record() so it is recorded too.
+  Launcher: C:\AliceSoft\SengokuRance-Yomitan, port 8643 (serve.ps1
+  -Port). One game per port: OPFS holds the game AND its saves, and
+  installing replaces both. Make game ZIPs with UTF-8 names (MSYS2 zip).
 - Keyboard Ctrl is unmapped in xsystem4/src/input.c (sdl_keytable) so it
   no longer triggers message skip; touch long-press still emulates Ctrl.
 - Local-build tweaks: play.ts redirects to install.html when no game is

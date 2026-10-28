@@ -439,6 +439,7 @@ static float sp_text_draw(struct sact_sprite *sp, struct sr_text_properties *tp,
 	}
 	tp->last_char = last_char;
 
+	sprite_text_record(sp, text->text, &tp->ts, x, y);
 	sprite_dirty(sp);
 	return gfx_render_text(&sp->text.texture, x, y, text->text, &tp->ts, false);
 }

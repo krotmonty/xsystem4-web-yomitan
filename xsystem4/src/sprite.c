@@ -452,6 +452,19 @@ static void sprite_clear_glyphs(struct sact_sprite *sp)
 	sp->text.cap_glyphs = 0;
 }
 
+// Records the characters of text drawn at (x, y) on the sprite's text
+// texture, for the Yomitan text layer.
+void sprite_text_record(struct sact_sprite *sp, const char *text, struct text_style *ts, float x, int y)
+{
+	struct glyph_record_ctx ctx = {
+		.sp = sp,
+		.origin_x = x,
+		.y = y,
+		.h = (int)ts->size,
+	};
+	gfx_layout_text(ts, text, sprite_record_glyph, &ctx);
+}
+
 void sprite_text_draw(struct sact_sprite *sp, struct string *text, struct text_style *ts)
 {
 	if (!sp->text.texture.handle) {
@@ -459,13 +472,7 @@ void sprite_text_draw(struct sact_sprite *sp, struct string *text, struct text_s
 	}
 
 	ts->font_spacing = sp->text.char_space;
-	struct glyph_record_ctx ctx = {
-		.sp = sp,
-		.origin_x = sp->text.pos.x,
-		.y = sp->text.pos.y,
-		.h = (int)ts->size,
-	};
-	gfx_layout_text(ts, text->text, sprite_record_glyph, &ctx);
+	sprite_text_record(sp, text->text, ts, sp->text.pos.x, sp->text.pos.y);
 	sp->text.pos.x += gfx_render_text(&sp->text.texture, sp->text.pos.x, sp->text.pos.y, text->text, ts, false);
 	if (sp->text.current_line_height < ts->size)
 		sp->text.current_line_height = ts->size;
