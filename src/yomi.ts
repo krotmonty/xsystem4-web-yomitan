@@ -7,7 +7,8 @@
 //
 // The layer only catches the mouse while Shift is held, so normal clicks
 // still go to the game. Hold Shift and hover a word to look it up.
-// Ctrl+Alt+Y shows the layer (for checking alignment).
+// Ctrl+Alt+Y shows the layer (for checking alignment). F11 fullscreens the
+// whole page so the layer stays above the canvas.
 
 type Line = [x: number, y: number, w: number, h: number, text: string];
 
@@ -40,6 +41,16 @@ export class YomiOverlay {
             if (e.ctrlKey && e.altKey && e.code === 'KeyY') {
                 this.layer.classList.toggle('debug');
                 e.preventDefault();
+            }
+            // The engine handles F11 by making only the canvas fullscreen,
+            // which hides this layer. Fullscreen the whole page instead.
+            if (e.code === 'F11') {
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                if (!e.repeat) {
+                    if (document.fullscreenElement) document.exitFullscreen();
+                    else document.documentElement.requestFullscreen();
+                }
             }
         }, true);
         window.addEventListener('keyup', (e) => {
