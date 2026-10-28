@@ -29,6 +29,17 @@ $('#restart-game').addEventListener('click', () => {
     }
 });
 
+// F1 toggles the menu. Caught before the engine, so the game never sees F1
+// (and the browser doesn't open its help page).
+window.addEventListener('keydown', (e) => {
+    if (e.code !== 'F1') return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    if (e.repeat || !window.shell) return;
+    if (dialog.open) dialog.close();
+    else open();
+}, true);
+
 // Close the dialog when clicked outside of the dialog.
 dialog.addEventListener('click', () => dialog.close());
 for (const e of Array.from(dialog.children)) {

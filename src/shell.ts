@@ -10,6 +10,7 @@ import { dictionary } from './strings.js';
 import * as sysmenu from './sysmenu.js';
 import * as manual from './manual.js';
 import { YomiOverlay } from './yomi.js';
+import { SaveSync } from './savesync.js';
 
 export interface XSys4Shell {
     m: XSys4Module;
@@ -95,6 +96,8 @@ export class Shell {
             shell = new Shell(module);
             (module as any).shell = shell;  // Enable C code to access this object.
             await shell.loadFonts();
+            // Load the saves from disk before the engine reads them.
+            (await SaveSync.create())?.start();
             $('#spinner')?.remove();
             window.onbeforeunload = (e: BeforeUnloadEvent) => e.returnValue = 'Any unsaved progress will be lost.';
         });

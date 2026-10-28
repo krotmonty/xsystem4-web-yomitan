@@ -25,9 +25,24 @@ Sengoku Rance: use "Start Sengoku Rance (Yomitan).bat" instead. It runs on
 its own port (8643), so it never replaces Rance VI or its saves. Each game
 must always be started with its own .bat file.
 
-After that, just double-click the .bat file to play. Saves are kept in
-the browser. To back them up, right-click the black bars beside the game
-picture: that opens the system menu, which has "Save to ZIP".
+After that, just double-click the .bat file to play.
+
+Saves
+-----
+Your saves are normal files in the "saves" folder next to the .bat file.
+While you play they are copied there a few seconds after the game saves;
+when you start the game they are loaded from there. So they survive
+reinstalling the game or clearing the browser, and you can copy that
+folder to back them up or move them to another PC. The previous version of
+each save is kept in saves\.previous, in case one gets overwritten by
+mistake. (The first time you start this version, your existing saves are
+copied into the folder automatically.)
+
+System menu
+-----------
+Press F1 (or right-click the black bars beside the game picture) to open
+the system menu: settings, Restart Game, and "Save to ZIP" / "Restore from
+ZIP" for your saves.
 
 Yomitan
 -------
@@ -42,7 +57,8 @@ Tips
   lines up with the game text.
 - Use F11 for fullscreen, not the game's own fullscreen option, or the
   text layer will be hidden.
-- Ctrl does not skip text (it fired by accident too often).
+- Ctrl skips text, like in the original game. If it fires by accident,
+  turn off "Ctrl key skips messages" in the system menu (F1).
 - If the page says the port is busy, another copy is already running.
 
 What was changed (for the curious)

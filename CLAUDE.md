@@ -38,7 +38,14 @@ Status: WORKING on the user's Rance VI (confirmed by the user).
 - System menu checkbox "Ctrl key skips messages" (#ctrlskip, src/sysmenu.ts,
   saved in localStorage 'ctrlskip', on by default). When off, the page calls
   input_set_keyboard_ctrl(0) in xsystem4/src/input.c so keyboard Ctrl never
-  reaches the game; touch long-press still emulates Ctrl.
+  reaches the game; touch long-press still emulates Ctrl. F1 toggles the
+  system menu (also right-click outside the game picture).
+- Saves as files: release/serve.ps1 serves a "saves" folder next to it at
+  /saves/ (GET list / GET file / PUT file, same-origin only; overwritten
+  files kept in saves\.previous). src/savesync.ts copies disk saves into
+  OPFS game/SaveData before the engine starts (disk wins), then uploads
+  changed OPFS saves every 3 s and on tab hide. Without the launcher
+  (/saves/ missing) it does nothing.
 - Local-build tweaks: play.ts redirects to install.html when no game is
   installed; service worker + Google Analytics loader removed.
 - release/: Windows launcher ("Start Rance (Yomitan).bat" → serve.ps1, a
