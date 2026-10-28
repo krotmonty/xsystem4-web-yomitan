@@ -26,10 +26,12 @@ ExternalProject_Add(
   libffi
   URL https://github.com/libffi/libffi/releases/download/v3.4.7/libffi-3.4.7.tar.gz
   URL_HASH SHA1=b07136211f47fa30c0512ebd7484fde724978d99
-  CONFIGURE_COMMAND emconfigure <SOURCE_DIR>/configure
+  BUILD_IN_SOURCE TRUE
+  CONFIGURE_COMMAND emconfigure sh ./configure
                       --host=wasm32-unknown-emscripten
                       --prefix=${stagingDir}
                       --disable-shared
+                      CC=emcc AR=emar RANLIB=emranlib
   BUILD_COMMAND emmake make
   INSTALL_COMMAND emmake make install
 )

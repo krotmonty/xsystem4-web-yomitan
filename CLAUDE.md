@@ -42,6 +42,19 @@ Build-environment workarounds made in the cloud sandbox (safe to keep or
 revert): libwebp and cglm fetched via git instead of tarballs;
 libjpeg-turbo built with -DWITH_SIMD=OFF (needed with emscripten 4.0.9).
 
+### Building on Windows (this PC)
+WSL is unavailable here (the Windows image lacks the feature), so the build
+uses MSYS2 UCRT64 + emsdk 5.0.3, both under C:\dev\tools:
+  build-windows.cmd             # → dist/, same as npm run build
+- C:\dev\tools\msys64: MSYS2 with make, bison, flex, autotools, git and
+  ucrt64 cmake/ninja/nodejs/python.
+- C:\dev\tools\shims: sh launchers for emcc/emcmake/emconfigure/emmake/emar/
+  emranlib (emsdk on Windows only ships .bat files).
+- libffi in CMakeLists.txt is built in-source with `sh ./configure` and
+  CC=emcc etc. by name, so it configures on Windows (still fine on Linux).
+- Output differs in size from the cloud build (emscripten 4.0.9 there).
+- release/site is NOT refreshed by the build; copy dist/ there (minus .map).
+
 ## Testing
 A tiny test game exists in the chat history (alice-tools-compiled .ain that
 draws Japanese text with SACT2.SP_TextDraw). Easier now: test on the real
