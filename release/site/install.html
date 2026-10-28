@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark" />
+    <link rel="stylesheet" href="lib/pico.min.css">
+    <link rel="stylesheet" href="index.css">
+    <title>XSystem4 Web Installer</title>
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-ER5NLGNC86"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      if (location.host.startsWith('localhost:')) {
+        gtag('config', 'G-ER5NLGNC86', { debug_mode:true });
+      } else {
+        gtag('config', 'G-ER5NLGNC86');
+      }
+    </script>
+  </head>
+  <body>
+    <header id="navbar" data-theme="dark">
+      <div class="container">
+        <nav>
+          <ul>
+            <li><strong>XSystem4 Web Installer</strong></li>
+          </ul>
+        </nav>
+      </div>
+    </header>
+
+    <div class="container">
+
+      <div id="installer">
+        <h3>Install</h3>
+        <section>
+          <p>Select a ZIP of your game folder (for example, the whole Rance VI folder zipped). This only needs to be done once.<span id="title" hidden></span></p>
+          <input type="file" id="file-picker"/>
+        </section>
+      </div>
+
+      <div id="installing" hidden>
+        <progress id="progress" value="0"></progress>
+        <p id="message">Installing… <span id="percentages"></span></p>
+        <p><small id="filename"></small></p>
+      </div>
+
+      <div id="game-start" hidden>
+        <a role="button" href="play.html">Start Game</a>
+      </div>
+
+    </div>
+
+    <div class="toast-container"></div>
+
+    <script type="module" src="install.js"></script>
+  </body>
+</html>

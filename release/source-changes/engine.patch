@@ -1,0 +1,400 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index c51b781..396423c 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -12,8 +12,8 @@ include(FetchContent)
+ 
+ FetchContent_Declare(
+   cglm
+-  URL https://github.com/recp/cglm/archive/refs/tags/v0.9.2.tar.gz
+-  URL_HASH SHA1=cb8472aa8c2ab67b66378dbaf10c2c7368d4e4c3
++  GIT_REPOSITORY https://github.com/recp/cglm.git
++  GIT_TAG v0.9.2
+ )
+ set(CGLM_STATIC ON CACHE BOOL "Static build" FORCE)
+ set(CGLM_SHARED OFF CACHE BOOL "Shared build" FORCE)
+@@ -250,7 +250,7 @@ target_link_options(xsystem4 PRIVATE
+   -sOFFSCREEN_FRAMEBUFFER=1
+   -sWASMFS=1
+   -sEXPORTED_RUNTIME_METHODS=FS,ENV,HEAP32
+-  -sEXPORTED_FUNCTIONS=_main,_malloc,_vm_stack_trace
++  -sEXPORTED_FUNCTIONS=_main,_malloc,_free,_vm_stack_trace
+   --embed-file=${CMAKE_CURRENT_LIST_DIR}/shaders@/shaders
+   --emit-tsd=xsystem4.d.ts
+ )
+diff --git a/include/gfx/font.h b/include/gfx/font.h
+index dda7db4..bae9b26 100644
+--- a/include/gfx/font.h
++++ b/include/gfx/font.h
+@@ -166,6 +166,8 @@ void gfx_draw_text_to_pmap(Texture *dst, int x, int y, char *text);
+ float gfx_size_char_unstyled(struct text_style *ts, const char *ch);
+ float gfx_size_char(struct text_style *ts, const char *ch);
+ float gfx_size_text(struct text_style *ts, const char *text);
++typedef void (*gfx_text_layout_cb)(void *data, const char *ch, int len, float x, float w);
++float gfx_layout_text(struct text_style *ts, const char *msg, gfx_text_layout_cb cb, void *data);
+ float gfx_get_actual_font_size(unsigned face, float size);
+ float gfx_get_actual_font_size_round_down(unsigned face, float size);
+ 
+diff --git a/include/scene.h b/include/scene.h
+index b5bebc9..d2d76e4 100644
+--- a/include/scene.h
++++ b/include/scene.h
+@@ -51,6 +51,11 @@ extern bool scene_is_dirty;
+ void scene_register_sprite(struct sprite *sp);
+ void scene_unregister_sprite(struct sprite *sp);
+ void scene_render(void);
++
++// In-game Yomitan text layer (see sprite.c).
++void textmap_begin(void);
++void textmap_collect(struct sprite *sp);
++void textmap_end(void);
+ int scene_set_wp(int cg_no);
+ int scene_set_wp_color(int r, int g, int b);
+ int scene_set_wp_texture(struct texture *tex);
+diff --git a/include/sprite.h b/include/sprite.h
+index 675368d..caaf514 100644
+--- a/include/sprite.h
++++ b/include/sprite.h
+@@ -28,6 +28,15 @@ struct page;
+ union vm_value;
+ struct text_style;
+ 
++// A single character drawn on a sprite's text texture, in sprite coordinates.
++struct sprite_glyph {
++	char ch[4];  // NUL-terminated character in the game's encoding
++	float x;
++	float w;
++	int y;
++	int h;
++};
++
+ struct sact_sprite {
+ 	struct sprite sp;
+ 	LIST_ENTRY(sact_sprite) entry;
+@@ -55,6 +64,11 @@ struct sact_sprite {
+ 		int char_space;
+ 		int line_space;
+ 		int current_line_height;
++		// Positions of the characters drawn on the text texture
++		// (for the in-game Yomitan text layer).
++		struct sprite_glyph *glyphs;
++		int nr_glyphs;
++		int cap_glyphs;
+ 	} text;
+ 	// The sprite handle
+ 	int no;
+diff --git a/src/scene.c b/src/scene.c
+index fd8f89c..399dc42 100644
+--- a/src/scene.c
++++ b/src/scene.c
+@@ -82,12 +82,15 @@ void scene_render(void)
+ 	}
+ 
+ 	struct sprite *sp;
++	textmap_begin();
+ 	TAILQ_FOREACH(sp, &sprite_list, entry) {
+ 		if (sp->render)
+ 			sp->render(sp);
+ 		else
+ 			WARNING("sprite in scene without render function");
++		textmap_collect(sp);
+ 	}
++	textmap_end();
+ }
+ 
+ int scene_set_wp(int cg_no) {
+diff --git a/src/sprite.c b/src/sprite.c
+index e845f88..121262f 100644
+--- a/src/sprite.c
++++ b/src/sprite.c
+@@ -15,6 +15,8 @@
+  */
+ 
+ #include <errno.h>
++#include <math.h>
++#include <string.h>
+ #include <stdlib.h>
+ #include <assert.h>
+ 
+@@ -30,6 +32,7 @@
+ #include "gfx/gfx.h"
+ #include "gfx/font.h"
+ #include "json.h"
++#include "cJSON.h"
+ #include "plugin.h"
+ #include "sprite.h"
+ #include "vm.h"
+@@ -54,6 +57,7 @@ void sprite_free(struct sact_sprite *sp)
+ 	scene_unregister_sprite(&sp->sp);
+ 	gfx_delete_texture(&sp->texture);
+ 	gfx_delete_texture(&sp->text.texture);
++	free(sp->text.glyphs);
+ 	if (sp->plugin) {
+ 		if (sp->plugin->free)
+ 			sp->plugin->free(sp->plugin);
+@@ -398,6 +402,56 @@ void sprite_set_text_pos(struct sact_sprite *sp, int x, int y)
+ 	sprite_dirty(sp);
+ }
+ 
++struct glyph_record_ctx {
++	struct sact_sprite *sp;
++	float origin_x;
++	int y;
++	int h;
++};
++
++static void sprite_record_glyph(void *data, const char *ch, int len, float x, float w)
++{
++	struct glyph_record_ctx *ctx = data;
++	struct sact_sprite *sp = ctx->sp;
++	if (len < 1 || len > 3)
++		return;
++	float gx = ctx->origin_x + x;
++
++	// A character drawn over an existing one replaces it.
++	for (int i = 0; i < sp->text.nr_glyphs; i++) {
++		struct sprite_glyph *g = &sp->text.glyphs[i];
++		if (g->y == ctx->y && fabsf(g->x - gx) < 0.5f) {
++			memmove(g, g + 1, (sp->text.nr_glyphs - i - 1) * sizeof(*g));
++			sp->text.nr_glyphs--;
++			break;
++		}
++	}
++
++	if (sp->text.nr_glyphs >= sp->text.cap_glyphs) {
++		int cap = sp->text.cap_glyphs ? sp->text.cap_glyphs * 2 : 64;
++		struct sprite_glyph *p = realloc(sp->text.glyphs, cap * sizeof(*p));
++		if (!p)
++			return;
++		sp->text.glyphs = p;
++		sp->text.cap_glyphs = cap;
++	}
++	struct sprite_glyph *g = &sp->text.glyphs[sp->text.nr_glyphs++];
++	memset(g->ch, 0, sizeof(g->ch));
++	memcpy(g->ch, ch, len);
++	g->x = gx;
++	g->w = w;
++	g->y = ctx->y;
++	g->h = ctx->h;
++}
++
++static void sprite_clear_glyphs(struct sact_sprite *sp)
++{
++	free(sp->text.glyphs);
++	sp->text.glyphs = NULL;
++	sp->text.nr_glyphs = 0;
++	sp->text.cap_glyphs = 0;
++}
++
+ void sprite_text_draw(struct sact_sprite *sp, struct string *text, struct text_style *ts)
+ {
+ 	if (!sp->text.texture.handle) {
+@@ -405,6 +459,13 @@ void sprite_text_draw(struct sact_sprite *sp, struct string *text, struct text_s
+ 	}
+ 
+ 	ts->font_spacing = sp->text.char_space;
++	struct glyph_record_ctx ctx = {
++		.sp = sp,
++		.origin_x = sp->text.pos.x,
++		.y = sp->text.pos.y,
++		.h = (int)ts->size,
++	};
++	gfx_layout_text(ts, text->text, sprite_record_glyph, &ctx);
+ 	sp->text.pos.x += gfx_render_text(&sp->text.texture, sp->text.pos.x, sp->text.pos.y, text->text, ts, false);
+ 	if (sp->text.current_line_height < ts->size)
+ 		sp->text.current_line_height = ts->size;
+@@ -414,6 +475,7 @@ void sprite_text_draw(struct sact_sprite *sp, struct string *text, struct text_s
+ void sprite_text_clear(struct sact_sprite *sp)
+ {
+ 	gfx_delete_texture(&sp->text.texture);
++	sprite_clear_glyphs(sp);
+ 	sprite_dirty(sp);
+ }
+ 
+@@ -442,6 +504,15 @@ void sprite_text_copy(struct sact_sprite *dsp, struct sact_sprite *ssp)
+ 		gfx_copy(&dsp->text.texture, 0, 0, &ssp->text.texture, 0, 0, ssp->text.texture.w, ssp->text.texture.h);
+ 		gfx_copy_amap(&dsp->text.texture, 0, 0, &ssp->text.texture, 0, 0, ssp->text.texture.w, ssp->text.texture.h);
+ 	}
++	if (ssp->text.nr_glyphs) {
++		size_t size = ssp->text.nr_glyphs * sizeof(struct sprite_glyph);
++		dsp->text.glyphs = malloc(size);
++		if (dsp->text.glyphs) {
++			memcpy(dsp->text.glyphs, ssp->text.glyphs, size);
++			dsp->text.nr_glyphs = ssp->text.nr_glyphs;
++			dsp->text.cap_glyphs = ssp->text.nr_glyphs;
++		}
++	}
+ 	dsp->text.home = ssp->text.home;
+ 	dsp->text.pos = ssp->text.pos;
+ 	dsp->text.char_space = ssp->text.char_space;
+@@ -499,3 +570,127 @@ void sprite_call_plugins(void)
+ 			sp->plugin->update(sp);
+ 	}
+ }
++
++
++/*
++ * In-game Yomitan text layer.
++ *
++ * Every time the scene is rendered, the text drawn on visible sprites is
++ * collected (with its position on screen) and, if it changed, sent to the web
++ * page, which places invisible HTML text over the canvas so that browser
++ * pop-up dictionaries such as Yomitan can scan it.
++ */
++#ifdef __EMSCRIPTEN__
++#include <emscripten.h>
++
++static cJSON *textmap_lines;
++static char *textmap_last;
++
++void textmap_begin(void)
++{
++	cJSON_Delete(textmap_lines);
++	textmap_lines = cJSON_CreateArray();
++}
++
++static void textmap_add_line(Rectangle *r, struct sprite_glyph *first, int n)
++{
++	char sjis[1024];
++	size_t len = 0;
++	for (int i = 0; i < n; i++) {
++		size_t l = strlen(first[i].ch);
++		if (len + l >= sizeof(sjis))
++			break;
++		memcpy(sjis + len, first[i].ch, l);
++		len += l;
++	}
++	sjis[len] = '\0';
++	if (!len)
++		return;
++
++	struct sprite_glyph *last = &first[n - 1];
++	float x = r->x + first->x;
++	float w = last->x + last->w - first->x;
++	int y = r->y + first->y;
++
++	char *utf = sjis2utf(sjis, len);
++	cJSON *line = cJSON_CreateArray();
++	cJSON_AddItemToArray(line, cJSON_CreateNumber(roundf(x * 10) / 10));
++	cJSON_AddItemToArray(line, cJSON_CreateNumber(y));
++	cJSON_AddItemToArray(line, cJSON_CreateNumber(roundf(w * 10) / 10));
++	cJSON_AddItemToArray(line, cJSON_CreateNumber(first->h));
++	cJSON_AddItemToArray(line, cJSON_CreateString(utf));
++	cJSON_AddItemToArray(textmap_lines, line);
++	free(utf);
++}
++
++void textmap_collect(struct sprite *_sp)
++{
++	if (!textmap_lines || _sp->render != sprite_render)
++		return;
++	struct sact_sprite *sp = (struct sact_sprite*)_sp;
++	if (!sp->text.nr_glyphs || !sp->text.texture.handle || sp->blend_rate <= 0)
++		return;
++
++	Rectangle r = sp->rect;
++	if (sp->surface_area.x || sp->surface_area.y) {
++		r.x -= sp->surface_area.x;
++		r.y -= sp->surface_area.y;
++	}
++
++	// Group consecutive characters on the same row into lines.
++	struct sprite_glyph *g = sp->text.glyphs;
++	int start = 0;
++	for (int i = 1; i <= sp->text.nr_glyphs; i++) {
++		bool split = i == sp->text.nr_glyphs
++			|| g[i].y != g[i-1].y
++			|| fabsf(g[i].x - (g[i-1].x + g[i-1].w)) > 2.0f;
++		if (!split)
++			continue;
++		// skip text outside the sprite's texture
++		if (g[start].y < sp->text.texture.h && g[start].x < sp->text.texture.w)
++			textmap_add_line(&r, &g[start], i - start);
++		start = i;
++	}
++}
++
++void textmap_end(void)
++{
++	if (!textmap_lines)
++		return;
++	cJSON *root = cJSON_CreateObject();
++	cJSON_AddNumberToObject(root, "w", config.view_width);
++	cJSON_AddNumberToObject(root, "h", config.view_height);
++	cJSON_AddItemToObject(root, "l", textmap_lines);
++	textmap_lines = NULL;
++	char *json = cJSON_PrintUnformatted(root);
++	cJSON_Delete(root);
++	if (!json)
++		return;
++
++	if (textmap_last && !strcmp(json, textmap_last)) {
++		free(json);
++		return;
++	}
++	free(textmap_last);
++	textmap_last = json;
++
++	// The page frees the copy once it has read it.
++	char *copy = strdup(json);
++	if (!copy)
++		return;
++	MAIN_THREAD_ASYNC_EM_ASM({
++		const json = UTF8ToString($0);
++		Module._free($0);
++		const shell = Module.shell;
++		if (shell && shell.yomi)
++			shell.yomi.update(json);
++	}, copy);
++}
++
++#else
++
++void textmap_begin(void) {}
++void textmap_collect(struct sprite *sp) {}
++void textmap_end(void) {}
++
++#endif
+diff --git a/src/text.c b/src/text.c
+index 62fa8c5..ab59d62 100644
+--- a/src/text.c
++++ b/src/text.c
+@@ -301,6 +301,38 @@ float gfx_render_textf(Texture *dst, float x, int y, char *msg, struct text_styl
+ 	return _gfx_render_text(dst, msg, &metrics);
+ }
+ 
++/*
++ * Lays out text exactly as gfx_render_textf() would, without drawing it.
++ * Calls `cb` with the x offset and advance of each character.
++ */
++float gfx_layout_text(struct text_style *ts, const char *msg, gfx_text_layout_cb cb, void *data)
++{
++	enum font_weight weight = gfx_int_to_font_weight(ts->weight);
++	struct font_size *font_size = text_style_font_size(ts);
++	float edge_spacing = gfx_text_advance_edges
++		? text_style_edge_width(ts) + ceilf(ts->bold_width)
++		: 0.f;
++
++	float pos_x = 0.f;
++	while (*msg) {
++		pos_x += edge_spacing;
++		float scale_x = *msg == ' ' ? ts->space_scale_x : ts->scale_x;
++		uint32_t code = char_to_code(msg, font_size->font->charmap);
++		const char *ch = msg;
++		int len = SJIS_2BYTE(*msg) ? 2 : 1;
++		msg += len;
++		struct glyph *glyph = font_get_glyph(font_size, code, weight);
++		if (!glyph)
++			continue;
++		float x = pos_x;
++		pos_x += glyph->advance * scale_x * config.text_x_scale + ts->font_spacing;
++		if (cb)
++			cb(data, ch, len, x, pos_x - x);
++		pos_x += edge_spacing;
++	}
++	return pos_x;
++}
++
+ int gfx_render_text(Texture *dst, float x, int y, char *msg, struct text_style *ts, bool blend)
+ {
+ 	return lroundf(gfx_render_textf(dst, x, y, msg, ts, blend));
