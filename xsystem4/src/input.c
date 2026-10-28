@@ -78,8 +78,8 @@ static enum sact_keycode sdl_keytable[] = {
 	[SDL_SCANCODE_RETURN] = VK_RETURN,
 	[SDL_SCANCODE_LSHIFT] = VK_SHIFT,
 	[SDL_SCANCODE_RSHIFT] = VK_SHIFT,
-	// Ctrl is not mapped: games use it for message skip, which fires by
-	// accident (e.g. Ctrl+Alt+Y for the Yomitan debug view).
+	[SDL_SCANCODE_LCTRL] = VK_CONTROL,
+	[SDL_SCANCODE_RCTRL] = VK_CONTROL,
 	[SDL_SCANCODE_LALT] = VK_MENU,
 	[SDL_SCANCODE_RALT] = VK_MENU,
 	[SDL_SCANCODE_PAUSE] = VK_PAUSE,
@@ -145,8 +145,26 @@ static enum sact_keycode sdl_keytable[] = {
 	[SDL_SCANCODE_SCROLLLOCK] = VK_SCROLL,
 };
 
+// Games use Ctrl for message skip, which can fire by accident (e.g. Ctrl+Alt+Y
+// for the Yomitan debug view), so the page can stop keyboard Ctrl from reaching
+// the game. Touch long-press still emulates Ctrl.
+static bool keyboard_ctrl_enabled = true;
+
+#ifdef __EMSCRIPTEN__
+EMSCRIPTEN_KEEPALIVE
+#endif
+void input_set_keyboard_ctrl(int enabled)
+{
+	keyboard_ctrl_enabled = enabled;
+	if (!enabled)
+		key_state[VK_CONTROL] = false;
+}
+
 static enum sact_keycode sdl_to_sact_key(SDL_Scancode scancode, SDL_Keymod modifiers)
 {
+	if (!keyboard_ctrl_enabled &&
+	    (scancode == SDL_SCANCODE_LCTRL || scancode == SDL_SCANCODE_RCTRL))
+		return 0;
 	if (!(modifiers & KMOD_NUM)) {
 		switch (scancode) {
 		case SDL_SCANCODE_KP_0:      return VK_INSERT;

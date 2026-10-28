@@ -8,6 +8,17 @@ import { OPFSWriter } from './opfs_writer.js';
 
 const dialog = $('#system-menu') as HTMLDialogElement;
 const msgskip = $('#msgskip') as HTMLInputElement;
+const ctrlskip = $('#ctrlskip') as HTMLInputElement;
+
+// Whether the keyboard Ctrl key reaches the game (games use it for message
+// skip). On by default; turning it off is remembered in localStorage.
+function ctrlSkipEnabled(): boolean {
+    return localStorage.getItem('ctrlskip') !== 'false';
+}
+
+export function applySettings() {
+    window.shell.m._input_set_keyboard_ctrl(ctrlSkipEnabled() ? 1 : 0);
+}
 
 $('#system-menu-close').addEventListener('click', () => dialog.close());
 $('#restart-game').addEventListener('click', () => {
@@ -34,11 +45,14 @@ export function initSaveMenu(gameName: string) {
 export function open() {
     dialog.appendChild($('.toast-container'));  // So that toasts are not hidden by the dialog.
     msgskip.checked = window.shell.m._MsgSkip_GetState() !== 0;
+    ctrlskip.checked = ctrlSkipEnabled();
     dialog.showModal();
 }
 
 dialog.addEventListener('close', () => {
     window.shell.m._MsgSkip_SetState(msgskip.checked ? 1 : 0);
+    localStorage.setItem('ctrlskip', String(ctrlskip.checked));
+    applySettings();
     document.body.appendChild($('.toast-container'));
 });
 

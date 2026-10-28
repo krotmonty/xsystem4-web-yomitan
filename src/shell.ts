@@ -129,6 +129,7 @@ export class Shell {
     set_title(title: string) {
         document.title = title + ' - xsystem4';
         sysmenu.initSaveMenu(title);
+        sysmenu.applySettings();
         gtag('event', 'GameStart', { Title: title });
     }
 

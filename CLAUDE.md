@@ -35,8 +35,10 @@ Status: WORKING on the user's Rance VI (confirmed by the user).
   Launcher: C:\AliceSoft\SengokuRance-Yomitan, port 8643 (serve.ps1
   -Port). One game per port: OPFS holds the game AND its saves, and
   installing replaces both. Make game ZIPs with UTF-8 names (MSYS2 zip).
-- Keyboard Ctrl is unmapped in xsystem4/src/input.c (sdl_keytable) so it
-  no longer triggers message skip; touch long-press still emulates Ctrl.
+- System menu checkbox "Ctrl key skips messages" (#ctrlskip, src/sysmenu.ts,
+  saved in localStorage 'ctrlskip', on by default). When off, the page calls
+  input_set_keyboard_ctrl(0) in xsystem4/src/input.c so keyboard Ctrl never
+  reaches the game; touch long-press still emulates Ctrl.
 - Local-build tweaks: play.ts redirects to install.html when no game is
   installed; service worker + Google Analytics loader removed.
 - release/: Windows launcher ("Start Rance (Yomitan).bat" → serve.ps1, a
