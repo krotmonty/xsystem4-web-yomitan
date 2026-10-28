@@ -28,6 +28,8 @@ Status: WORKING on the user's Rance VI (confirmed by the user).
   canvas (same letterboxing as video.c), scaleX-fitted to the game's width.
   Lines get pointer-events only while Shift is held; mouse events on them are
   re-dispatched to the canvas. Ctrl+Alt+Y = debug view (red text).
+- Keyboard Ctrl is unmapped in xsystem4/src/input.c (sdl_keytable) so it
+  no longer triggers message skip; touch long-press still emulates Ctrl.
 - Local-build tweaks: play.ts redirects to install.html when no game is
   installed; service worker + Google Analytics loader removed.
 - release/: Windows launcher ("Start Rance (Yomitan).bat" → serve.ps1, a

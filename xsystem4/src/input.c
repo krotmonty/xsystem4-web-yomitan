@@ -78,8 +78,8 @@ static enum sact_keycode sdl_keytable[] = {
 	[SDL_SCANCODE_RETURN] = VK_RETURN,
 	[SDL_SCANCODE_LSHIFT] = VK_SHIFT,
 	[SDL_SCANCODE_RSHIFT] = VK_SHIFT,
-	[SDL_SCANCODE_LCTRL] = VK_CONTROL,
-	[SDL_SCANCODE_RCTRL] = VK_CONTROL,
+	// Ctrl is not mapped: games use it for message skip, which fires by
+	// accident (e.g. Ctrl+Alt+Y for the Yomitan debug view).
 	[SDL_SCANCODE_LALT] = VK_MENU,
 	[SDL_SCANCODE_RALT] = VK_MENU,
 	[SDL_SCANCODE_PAUSE] = VK_PAUSE,
